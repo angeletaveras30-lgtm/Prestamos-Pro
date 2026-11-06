@@ -1,0 +1,16 @@
+{
+  "name": "PRÉSTAMOS PRO",
+  "short_name": "Préstamos PRO",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f3f6fa",
+  "theme_color": "#142d4e",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
