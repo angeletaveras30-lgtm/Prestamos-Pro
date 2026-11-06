@@ -139,7 +139,7 @@ loginForm.addEventListener("submit",async e=>{
       $("loginPassword").value
     );
   }catch(error){
-    $("loginMessage").textContent="No se pudo iniciar sesión. Revisa tu correo y contraseña.";
+    $("loginMessage").textContent=error.code+": "+error.message;
   }
 });
 
