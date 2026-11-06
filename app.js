@@ -21,7 +21,7 @@ const auth = getAuth(firebaseApp);
 const cloudDB = getFirestore(firebaseApp);
 // Aplicación local-first. Para habilitar nube, configura Firebase según README.
 const KEY="control-cash-v1";
- const today=()=>new Date().toISOString().slice(0,10);
+  const today=()=>new Date().toISOString().slice(0,10);
 let db=load();
 let cloudReady=false;
 let saving=false;
