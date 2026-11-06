@@ -1,9 +1,55 @@
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+
+import {
+  getAuth,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signOut
+} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+
+import {
+  getFirestore,
+  doc,
+  getDoc,
+  setDoc
+} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+
+import { firebaseConfig } from "./firebase-config.js";
+
+const firebaseApp = initializeApp(firebaseConfig);
+const auth = getAuth(firebaseApp);
+const cloudDB = getFirestore(firebaseApp);
 // Aplicación local-first. Para habilitar nube, configura Firebase según README.
 const KEY="control-cash-v1";
-const today=()=>new Date().toISOString().slice(0,10);
-let db=load();
-function load(){try{return JSON.parse(localStorage.getItem(KEY))||{clients:[],loans:[],payments:[]}}catch{return {clients:[],loans:[],payments:[]}}}
-function save(){localStorage.setItem(KEY,JSON.stringify(db));render()}
+const today=()=>new Date().toISOString().slice(let db=load();
+let cloudReady=false;
+let saving=false;
+
+function load(){
+  try{
+    return JSON.parse(localStorage.getItem(KEY))||{
+      clients:[],loans:[],payments:[]
+    };
+  }catch{
+    return {clients:[],loans:[],payments:[]};
+  }
+}
+
+async function save(){
+  localStorage.setItem(KEY,JSON.stringify(db));
+  render();
+
+  if(auth.currentUser && cloudReady){
+    try{
+      await setDoc(
+        doc(cloudDB,"users",auth.currentUser.uid,"data","main"),
+        db
+      );
+    }catch(error){
+      alert("Error guardando en la nube: "+error.message);
+    }
+  }
+}
 const $=id=>document.getElementById(id);
 const money=(n,c)=>new Intl.NumberFormat("es-DO",{style:"currency",currency:c==="USD"?"USD":"DOP"}).format(Number(n)||0);
 const fmt=d=>d?new Date(d+"T12:00:00").toLocaleDateString("es-DO"):"—";
@@ -44,3 +90,82 @@ $("restore").onchange=async e=>{try{let x=JSON.parse(await e.target.files[0].tex
 function download(content,name,type){let a=document.createElement("a"),u=URL.createObjectURL(new Blob([content],{type}));a.href=u;a.download=name;a.click();URL.revokeObjectURL(u)}
 $("loanForm").elements.start.value=today();$("paymentForm").elements.date.value=today();render();
 if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}));
+// ACCESO PRIVADO Y SINCRONIZACIÓN CON FIREBASE
+
+document.body.insertAdjacentHTML("afterbegin", `
+<div id="loginPanel" style="max-width:400px;margin:60px auto;padding:25px;background:white;border-radius:15px;font-family:Arial">
+  <h2 style="text-align:center">PRÉSTAMOS PRO</h2>
+  <p style="text-align:center">Acceso de administrador</p>
+  <form id="loginForm">
+    <input id="loginEmail" type="email" placeholder="Correo electrónico" required
+      style="width:100%;padding:13px;margin:8px 0;box-sizing:border-box">
+    <input id="loginPassword" type="password" placeholder="Contraseña" required
+      style="width:100%;padding:13px;margin:8px 0;box-sizing:border-box">
+    <button type="submit" style="width:100%;padding:14px;margin-top:10px">
+      Iniciar sesión
+    </button>
+  </form>
+  <p id="loginMessage" style="color:#b00020"></p>
+</div>
+`);
+
+const loginPanel = $("loginPanel");
+const loginForm = $("loginForm");
+const appHeader = document.querySelector("header");
+const appMain = document.querySelector("main");
+
+function showLogin(message=""){
+  cloudReady=false;
+  loginPanel.style.display="block";
+  if(appHeader) appHeader.style.display="none";
+  if(appMain) appMain.style.display="none";
+  $("loginMessage").textContent=message;
+}
+
+function showApp(){
+  loginPanel.style.display="none";
+  if(appHeader) appHeader.style.display="";
+  if(appMain) appMain.style.display="";
+  render();
+}
+
+loginForm.addEventListener("submit",async e=>{
+  e.preventDefault();
+  $("loginMessage").textContent="Verificando acceso...";
+  try{
+    await signInWithEmailAndPassword(
+      auth,
+      $("loginEmail").value.trim(),
+      $("loginPassword").value
+    );
+  }catch(error){
+    $("loginMessage").textContent="No se pudo iniciar sesión. Revisa tu correo y contraseña.";
+  }
+});
+
+onAuthStateChanged(auth,async user=>{
+  if(!user){
+    showLogin();
+    return;
+  }
+
+  cloudReady=false;
+  $("loginMessage").textContent="Cargando tus datos...";
+
+  try{
+    const ref=doc(cloudDB,"users",user.uid,"data","main");
+    const snapshot=await getDoc(ref);
+
+    if(snapshot.exists()){
+      db=snapshot.data();
+    }else{
+      await setDoc(ref,db);
+    }
+
+    localStorage.setItem(KEY,JSON.stringify(db));
+    cloudReady=true;
+    showApp();
+  }catch(error){
+    showLogin("Error de conexión con Firebase: "+error.message);
+  }
+});
